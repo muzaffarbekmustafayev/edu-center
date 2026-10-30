@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: edu_center_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: edu_center
+      TZ: Asia/Tashkent
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - edu_internal_net
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: edu_center_server
+    restart: always
+    environment:
+      DATABASE_URL: "postgresql://postgres:${DB_PASSWORD}@postgres:5432/edu_center?schema=public"
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TZ: Asia/Tashkent
+    depends_on:
+      - postgres
+    networks:
+      - edu_internal_net
+      - edu_public_net
+
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    container_name: edu_center_bot
+    restart: always
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      WEBHOOK_URL: ${WEBHOOK_URL}
+      WEBHOOK_SECRET_TOKEN: ${WEBHOOK_SECRET_TOKEN}
+      SERVER_API_URL: "http://server:3000"
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      TZ: Asia/Tashkent
+    depends_on:
+      - server
+    networks:
+      - edu_internal_net
+      - edu_public_net
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: edu_center_client
+    restart: always
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    networks:
+      - edu_public_net
+
+networks:
+  edu_internal_net:
+    internal: true
+  edu_public_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
